@@ -1,3 +1,34 @@
+/**
+ * ============================================================================
+ * MODULE: PDF ENGINE (Bit-Exact Attachment & Dual-Layer Verification)
+ * ============================================================================
+ * Dự án: ATBM_HTTT - PDF Ed25519 Cryptographic Audit System
+ * 
+ * Vấn đề "Bẫy Serialization" (PDF Serialization Trap) và Giải pháp:
+ * 1. Bẫy Serialization là gì?
+ *    - Khi ký số một file PDF bằng cách chèn chữ ký trực tiếp vào cấu trúc trang,
+ *      mỗi thư viện hoặc trình đọc PDF (Adobe, Foxit, PDF.js, pdf-lib) khi lưu lại
+ *      đều serialize lại đối tượng (thay đổi thứ tự object ID, thay đổi dictionary seed,
+ *      thay đổi ngày tháng modification date, cập nhật bảng XRef).
+ *    - Điều này làm thay đổi chuỗi byte nhị phân của file -> mã băm SHA-256 bị thay đổi,
+ *      khiến việc xác thực toàn vẹn theo chuẩn thông thường rất dễ bị gãy (false positive).
+ * 
+ * 2. Giải pháp PDF Attachment (Đính kèm tệp gốc nguyên vẹn):
+ *    - Tệp gốc ban đầu (originalFileBytes) được nén nguyên vẹn vào luồng stream đính kèm
+ *      chuẩn PDF: '/EmbeddedFiles' -> 'original_source.pdf'.
+ *    - Khi kiểm tra, hệ thống bóc tách đúng stream này ra để tính toán mã băm SHA-256
+ *      và đối soát chữ ký số Ed25519 -> Đảm bảo độ chính xác Bit-Exact 100%.
+ * 
+ * 3. Cơ chế phòng thủ 2 lớp (Dual-Layer Anti-Tampering Defense):
+ *    - Lớp 1 (Cryptographic Proof): Chữ ký số Ed25519 bảo vệ tệp đính kèm original_source.pdf.
+ *    - Lớp 2 (Visual Display Proof): Đối soát từng trang hiển thị (trang 1 đến N-1) của file upload
+ *      với các trang của tệp gốc. Trích xuất cả luồng lệnh vẽ (/Contents) và chú thích (/Annots).
+ *      Nếu phát hiện có người dùng PDF Editor vẽ thêm nét, đổi số tiền, chèn chữ giả mạo -> Báo ĐỎ.
+ *    - Lớp 3 (Binary Corruption Defense): Nhận diện tệp bị hư hại nhị phân do mở và lưu bằng
+ *      trình soạn thảo văn bản thuần (như Notepad) để hiển thị cảnh báo đỏ trực quan.
+ * ============================================================================
+ */
+
 import {
   PDFDocument,
   StandardFonts,
