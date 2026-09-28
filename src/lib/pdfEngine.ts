@@ -7,6 +7,7 @@ import {
   PDFDict,
   PDFArray,
   PDFString,
+  PDFRawStream,
   decodePDFRawStream,
 } from 'pdf-lib';
 import QRCode from 'qrcode';
@@ -38,6 +39,7 @@ export interface VerificationResult {
   publicKey: string;
   signature: string;
   extractedFileBytes?: Uint8Array;
+  tamperReason?: string;
 }
 
 interface StoredMetadata {
@@ -53,7 +55,7 @@ interface StoredMetadata {
 
 /**
  * Normalizes text to ASCII safe characters for rendering with StandardFonts (WinAnsi).
- * Preserves the visual readability without crashing on Vietnamese diacritics.
+ * Preserves visual readability without crashing on Vietnamese diacritics.
  */
 function sanitizeForPdf(text: string): string {
   if (!text) return '';
@@ -133,6 +135,80 @@ function extractAttachment(
     console.error('Error extracting PDF attachment:', error);
     return null;
   }
+}
+
+/**
+ * Extracts and concatenates all decoded content stream bytes for a given page.
+ */
+function getPageContentBytes(page: any, doc: PDFDocument): Uint8Array {
+  const contentsRef = page.node.get(PDFName.of('Contents'));
+  if (!contentsRef) return new Uint8Array(0);
+
+  const contentsObj = doc.context.lookup(contentsRef);
+  if (!contentsObj) return new Uint8Array(0);
+
+  const streams: any[] = [];
+  if (contentsObj instanceof PDFArray) {
+    for (let i = 0; i < contentsObj.size(); i++) {
+      const streamObj = doc.context.lookup(contentsObj.get(i));
+      if (streamObj) streams.push(streamObj);
+    }
+  } else {
+    streams.push(contentsObj);
+  }
+
+  const chunks: Uint8Array[] = [];
+  for (const stream of streams) {
+    if (stream instanceof PDFRawStream) {
+      try {
+        const decoded = decodePDFRawStream(stream).decode();
+        chunks.push(decoded);
+      } catch {
+        chunks.push(stream.getContents());
+      }
+    } else if (stream && typeof stream.getContents === 'function') {
+      chunks.push(stream.getContents());
+    }
+  }
+
+  const totalLength = chunks.reduce((acc, c) => acc + c.length, 0);
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const c of chunks) {
+    result.set(c, offset);
+    offset += c.length;
+  }
+  return result;
+}
+
+/**
+ * Serializes the annotations (/Annots) of a page (e.g. ink drawings, highlights, text notes).
+ */
+function getPageAnnotationsRepresentation(page: any, doc: PDFDocument): string {
+  const annotsRef = page.node.get(PDFName.of('Annots'));
+  if (!annotsRef) return '';
+  const annotsObj = doc.context.lookup(annotsRef);
+  if (!(annotsObj instanceof PDFArray)) return '';
+  let rep = '';
+  for (let i = 0; i < annotsObj.size(); i++) {
+    const annot = doc.context.lookup(annotsObj.get(i));
+    if (annot) rep += annot.toString();
+  }
+  return rep;
+}
+
+/**
+ * Computes a SHA-256 fingerprint of a page including its content streams and annotations.
+ */
+async function getPageFingerprint(page: any, doc: PDFDocument): Promise<string> {
+  const contentBytes = getPageContentBytes(page, doc);
+  const annotsRep = getPageAnnotationsRepresentation(page, doc);
+  const annotsBytes = new TextEncoder().encode(annotsRep);
+
+  const combined = new Uint8Array(contentBytes.length + annotsBytes.length);
+  combined.set(contentBytes, 0);
+  combined.set(annotsBytes, contentBytes.length);
+  return await sha256(combined);
 }
 
 /**
@@ -466,33 +542,50 @@ export async function createSignedPdf(
 }
 
 /**
- * Sprint 3 - verifySignedPdf
+ * Sprint 3 & 4 Extended - verifySignedPdf
  * 1. Loads signedPdfBytes into PDFDocument.
- * 2. Extracts attached 'original_source.pdf'.
- *    - If missing: Throws 'Tài liệu không phải file có chứng thực hợp lệ'.
- * 3. Recalculates hash: recalculatedHash = await sha256(extractedBytes).
- * 4. Reads signature and publicKey from PDF Metadata.
- * 5. Calls verifySignature(recalculatedHash, signature, publicKey).
- * 6. Returns VerificationResult.
+ * 2. Checks if file is damaged/corrupted by external text editors (Notepad).
+ * 3. Extracts attached 'original_source.pdf'.
+ * 4. Recalculates hash: recalculatedHash = await sha256(extractedBytes).
+ * 5. Reads signature and publicKey from PDF Metadata.
+ * 6. Verifies cryptographic signature with Ed25519.
+ * 7. Crucial Defense: Compares visible pages (1 to N-1) against the attached original document
+ *    (fingerprinting content streams and annotations) to catch PDF Editor drawings, text edits, or page tampering!
+ * 8. Returns VerificationResult.
  */
 export async function verifySignedPdf(
   signedPdfBytes: Uint8Array
 ): Promise<VerificationResult> {
-  // 1. Load document
-  const pdfDoc = await PDFDocument.load(signedPdfBytes, {
-    ignoreEncryption: true,
-  });
-
-  // 2. Extract attached original source file
-  const extractedBytes = extractAttachment(pdfDoc, 'original_source.pdf');
-  if (!extractedBytes || extractedBytes.length === 0) {
+  // 1. Try loading document with pdf-lib
+  let pdfDoc: PDFDocument;
+  try {
+    pdfDoc = await PDFDocument.load(signedPdfBytes, {
+      ignoreEncryption: true,
+    });
+  } catch {
+    // If PDF fails to parse, check if it was altered by Notepad or text editor
+    const textPreview = new TextDecoder('latin1').decode(signedPdfBytes.slice(0, 100000));
+    if (
+      textPreview.includes('Ed25519') ||
+      textPreview.includes('original_source.pdf') ||
+      textPreview.includes('Ed25519Signature')
+    ) {
+      return {
+        isValid: false,
+        originalHash: '(Không thể đọc do cấu trúc tệp bị hỏng)',
+        recalculatedHash: '(Cấu trúc tệp PDF đã bị phá hủy)',
+        signerName: 'Tài liệu có dấu hiệu can thiệp',
+        timestamp: new Date().toISOString(),
+        publicKey: '',
+        signature: '',
+        tamperReason:
+          'Tài liệu đã bị can thiệp nhị phân hoặc chỉnh sửa bằng công cụ ngoài (như Notepad/Text Editor), làm sai lệch byte offset và phá vỡ cấu trúc nhị phân của tệp PDF!',
+      };
+    }
     throw new Error('Tài liệu không phải file có chứng thực hợp lệ');
   }
 
-  // 3. Recalculate SHA-256 hash of the extracted original file
-  const recalculatedHash = await sha256(extractedBytes);
-
-  // 4. Retrieve metadata from Subject JSON or Info dictionary
+  // 2. Retrieve metadata from Subject JSON or Info dictionary
   let originalHash = '';
   let signature = '';
   let publicKey = '';
@@ -504,10 +597,15 @@ export async function verifySignedPdf(
 
   // Try parsing structured metadata from Subject
   const subjectStr = pdfDoc.getSubject();
+  let hasAuditMetadata = false;
+
   if (subjectStr) {
     try {
       const parsed: StoredMetadata = JSON.parse(subjectStr);
-      if (parsed.originalHash) originalHash = parsed.originalHash;
+      if (parsed.originalHash) {
+        originalHash = parsed.originalHash;
+        hasAuditMetadata = true;
+      }
       if (parsed.signature) signature = parsed.signature;
       if (parsed.publicKey) publicKey = parsed.publicKey;
       if (parsed.signerName) signerName = parsed.signerName;
@@ -530,6 +628,7 @@ export async function verifySignedPdf(
           const hashObj = info.lookup(PDFName.of('Ed25519Hash'));
           if (hashObj && 'asString' in hashObj) {
             originalHash = (hashObj as { asString: () => string }).asString();
+            hasAuditMetadata = true;
           }
         }
         if (!signature) {
@@ -559,7 +658,48 @@ export async function verifySignedPdf(
     console.warn('Warning: Could not read Info dictionary:', error);
   }
 
-  // 5. Verify cryptographic signature
+  // Check keywords for audit indicators
+  const keywords = pdfDoc.getKeywords();
+  if (keywords && keywords.includes('Ed25519')) {
+    hasAuditMetadata = true;
+  }
+
+  // 3. Extract attached original source file
+  const extractedBytes = extractAttachment(pdfDoc, 'original_source.pdf');
+  if (!extractedBytes || extractedBytes.length === 0) {
+    // Check if raw bytes contain markers indicating this was an audit-signed file
+    const textRaw = new TextDecoder('latin1').decode(signedPdfBytes.slice(0, 100000));
+    const hasAuditMarkerInRaw =
+      hasAuditMetadata ||
+      textRaw.includes('/EmbeddedFile') ||
+      textRaw.includes('EmbeddedFiles') ||
+      textRaw.includes('original_source') ||
+      textRaw.includes('Ed25519');
+
+    if (hasAuditMarkerInRaw) {
+      return {
+        isValid: false,
+        originalHash: originalHash || '(Không thể bóc tách do tệp bị phá hỏng cấu trúc)',
+        recalculatedHash: '(Cấu trúc tệp PDF đã bị phá hủy / Notepad edit)',
+        signerName: signerName !== 'Unknown Signer' ? signerName : 'Tài liệu có dấu hiệu can thiệp',
+        signerRole,
+        reason,
+        fileName,
+        timestamp,
+        publicKey: publicKey || '',
+        signature: signature || '',
+        tamperReason:
+          'Tài liệu có chứng thư chữ ký số nhưng cấu trúc tệp đính kèm (original_source.pdf) đã bị can thiệp, xóa bỏ hoặc phá hỏng cấu trúc nhị phân (do mở và lưu bằng trình soạn thảo văn bản như Notepad)!',
+      };
+    }
+    // Genuine unsigned document
+    throw new Error('Tài liệu không phải file có chứng thực hợp lệ');
+  }
+
+  // 4. Recalculate SHA-256 hash of the extracted original file
+  const recalculatedHash = await sha256(extractedBytes);
+
+  // 5. Verify cryptographic signature of the attachment
   const isHashMatching =
     Boolean(originalHash) &&
     originalHash.toLowerCase() === recalculatedHash.toLowerCase();
@@ -569,12 +709,98 @@ export async function verifySignedPdf(
     Boolean(publicKey) &&
     verifySignature(recalculatedHash, signature, publicKey);
 
-  const isValid = Boolean(isHashMatching && isSigValid);
+  if (!isHashMatching || !isSigValid) {
+    return {
+      isValid: false,
+      originalHash: originalHash || recalculatedHash,
+      recalculatedHash,
+      signerName,
+      signerRole,
+      reason,
+      fileName,
+      timestamp,
+      publicKey,
+      signature,
+      extractedFileBytes: extractedBytes,
+      tamperReason: !isHashMatching
+        ? 'Mã băm SHA-256 của tệp đính kèm không khớp với mã băm trong chứng thư gốc!'
+        : 'Chữ ký số Ed25519 không hợp lệ hoặc đã bị giả mạo với khóa công khai!',
+    };
+  }
 
-  // 6. Return verification result object
+  // 6. CRUCIAL CHECK: Verify visible content pages (1 to N-1) against the attached original document!
+  // This detects PDF Editor vandalism (drawing, adding text, changing content, adding/deleting pages).
+  let origDoc: PDFDocument;
+  try {
+    origDoc = await PDFDocument.load(extractedBytes, { ignoreEncryption: true });
+  } catch {
+    return {
+      isValid: false,
+      originalHash,
+      recalculatedHash,
+      signerName,
+      signerRole,
+      reason,
+      fileName,
+      timestamp,
+      publicKey,
+      signature,
+      extractedFileBytes: extractedBytes,
+      tamperReason: 'Tệp đính kèm gốc bị hỏng không thể nạp để đối soát các trang hiển thị!',
+    };
+  }
+
+  const origPageCount = origDoc.getPageCount();
+  const uploadedPageCount = pdfDoc.getPageCount();
+
+  // The signed PDF must contain exactly origPageCount + 1 pages (all original pages + 1 Audit Trail page)
+  if (uploadedPageCount !== origPageCount + 1) {
+    return {
+      isValid: false,
+      originalHash,
+      recalculatedHash,
+      signerName,
+      signerRole,
+      reason,
+      fileName,
+      timestamp,
+      publicKey,
+      signature,
+      extractedFileBytes: extractedBytes,
+      tamperReason: `Số lượng trang hiển thị (${uploadedPageCount} trang) không khớp với số trang gốc trong chứng thư (${origPageCount} trang gốc + 1 trang kiểm toán)! Phát hiện tài liệu đã bị thêm hoặc bớt trang.`,
+    };
+  }
+
+  // Compare content streams and annotations of each visible page (pages 0 to origPageCount - 1)
+  for (let i = 0; i < origPageCount; i++) {
+    const origPage = origDoc.getPage(i);
+    const uploadedPage = pdfDoc.getPage(i);
+
+    const origFp = await getPageFingerprint(origPage, origDoc);
+    const uploadedFp = await getPageFingerprint(uploadedPage, pdfDoc);
+
+    if (origFp !== uploadedFp) {
+      return {
+        isValid: false,
+        originalHash,
+        recalculatedHash,
+        signerName,
+        signerRole,
+        reason,
+        fileName,
+        timestamp,
+        publicKey,
+        signature,
+        extractedFileBytes: extractedBytes,
+        tamperReason: `Phát hiện nội dung hiển thị của tài liệu đã bị can thiệp hoặc chỉnh sửa trái phép (Trang ${i + 1} có thêm nét vẽ, chữ mới hoặc nội dung trang bị khác biệt so với bản gốc trong chứng thư)!`,
+      };
+    }
+  }
+
+  // 7. All cryptographic & visible content checks passed successfully
   return {
-    isValid,
-    originalHash: originalHash || recalculatedHash,
+    isValid: true,
+    originalHash,
     recalculatedHash,
     signerName,
     signerRole,
