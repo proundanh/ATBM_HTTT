@@ -1,0 +1,12 @@
+services:
+  # edupasskey.api:
+  #   image: ${DOCKER_REGISTRY-}edupasskeyapi
+  #   build:
+  #     context: .
+  #     dockerfile: EduPasskey.API/Dockerfile
+  #   depends_on:
+  #     - progesdb
+
+  progesdb:
+    image: postgres:17-alpine
+    container_name: progesdb
