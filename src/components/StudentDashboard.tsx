@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import {
   User as UserIcon,
   ShieldCheck,
@@ -31,7 +31,7 @@ export const StudentDashboard = ({
   const [stepUpSuccess, setStepUpSuccess] = useState(false);
   const [stepUpLoading, setStepUpLoading] = useState(false);
 
-  const handleTriggerStepUp = (e: React.FormEvent) => {
+  const handleTriggerStepUp = (e: FormEvent) => {
     e.preventDefault();
     setStepUpOpen(true);
     setStepUpSuccess(false);

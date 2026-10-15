@@ -134,11 +134,34 @@ export async function startPasskeyRegistration(options: any) {
 }
 
 /**
+ * Chuẩn hóa AssertionOptions từ C# Fido2-net-lib trước khi đưa vào @simplewebauthn/browser
+ */
+export function normalizeAssertionOptions(rawOptions: any): any {
+  const opts = { ...rawOptions };
+
+  // Đảm bảo challenge là base64url string
+  if (opts.challenge) {
+    opts.challenge = toBase64Url(opts.challenge);
+  }
+
+  // Đảm bảo allowCredentials có id là base64url string
+  if (Array.isArray(opts.allowCredentials)) {
+    opts.allowCredentials = opts.allowCredentials.map((c: any) => ({
+      ...c,
+      id: toBase64Url(c.id),
+    }));
+  }
+
+  return opts;
+}
+
+/**
  * Kích hoạt popup WebAuthn trên trình duyệt để Đăng nhập Passkey
  */
 export async function startPasskeyAuthentication(options: any) {
   try {
-    const credential = await swStartAuthentication({ optionsJSON: options });
+    const normalizedOptions = normalizeAssertionOptions(options);
+    const credential = await swStartAuthentication({ optionsJSON: normalizedOptions });
     return credential;
   } catch (error: any) {
     throw new Error(translateWebAuthnError(error));

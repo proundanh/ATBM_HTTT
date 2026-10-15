@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import {
   Fingerprint,
   User as UserIcon,
@@ -25,15 +25,17 @@ interface RegisterTabProps {
   onRegisterSuccess: (user: User, credential: CredentialDto) => void;
   onAddInspectPacket: (packet: InspectPacket) => void;
   onNavigateToLogin: () => void;
+  onNavigateToDashboard?: () => void;
   isBackendOnline: boolean;
 }
 
-export const RegisterTab: React.FC<RegisterTabProps> = ({
+export const RegisterTab = ({
   onRegisterSuccess,
   onAddInspectPacket,
   onNavigateToLogin,
+  onNavigateToDashboard,
   isBackendOnline,
-}) => {
+}: RegisterTabProps) => {
   const [studentCode, setStudentCode] = useState('SV001');
   const [fullName, setFullName] = useState('Nguyễn Văn A');
   const [email, setEmail] = useState('sv001@school.edu.vn');
@@ -60,7 +62,7 @@ export const RegisterTab: React.FC<RegisterTabProps> = ({
     checkDevicePasskeyCapability().then(setDeviceCapability);
   }, []);
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleRegister = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setRegisteredResult(null);
@@ -266,17 +268,26 @@ export const RegisterTab: React.FC<RegisterTabProps> = ({
             </div>
 
             <div className="flex flex-col sm:flex-row justify-center items-center gap-3">
+              {onNavigateToDashboard && (
+                <button
+                  onClick={onNavigateToDashboard}
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-bold text-sm transition-all shadow-lg shadow-emerald-500/25 flex items-center justify-center space-x-2"
+                >
+                  <span>Vào Cổng Sinh Viên Ngay</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
+
               <button
                 onClick={onNavigateToLogin}
-                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition-all shadow-lg shadow-emerald-500/25 flex items-center justify-center space-x-2"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm transition-all flex items-center justify-center space-x-2 border border-slate-700"
               >
-                <span>Thử Đăng Nhập Bằng Passkey</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>Thử Đăng Nhập Lại</span>
               </button>
 
               <button
                 onClick={() => setRegisteredResult(null)}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition-all"
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-400 text-sm font-medium transition-all"
               >
                 Đăng ký tài khoản khác
               </button>

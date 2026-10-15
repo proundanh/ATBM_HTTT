@@ -79,6 +79,7 @@ export function App() {
             onRegisterSuccess={handleRegisterSuccess}
             onAddInspectPacket={addInspectPacket}
             onNavigateToLogin={() => setActiveTab('login')}
+            onNavigateToDashboard={() => setActiveTab('dashboard')}
             isBackendOnline={isBackendOnline}
           />
         )}

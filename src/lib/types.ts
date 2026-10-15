@@ -32,6 +32,15 @@ export interface RegisterVerifyData {
   credential: CredentialDto;
 }
 
+export interface LoginOptionsData {
+  ceremonyId: string;
+  options: any;
+}
+
+export interface LoginVerifyData {
+  user: User;
+}
+
 export interface InspectPacket {
   id: string;
   title: string;
