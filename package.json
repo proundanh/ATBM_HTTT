@@ -1,5 +1,5 @@
 {
-  "name": "pdf-ed25519-audit",
+  "name": "edupasskey-student-portal",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@noble/curves": "^2.4.0",
+    "@simplewebauthn/browser": "^14.0.0",
     "clsx": "^2.1.1",
     "lucide-react": "^1.48.0",
     "pdf-lib": "^1.17.1",

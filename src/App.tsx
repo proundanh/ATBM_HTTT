@@ -1,73 +1,133 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
-import { SignerTab } from './components/SignerTab';
-import { VerifierTab } from './components/VerifierTab';
-import { ShieldCheck, Cpu, Database, EyeOff } from 'lucide-react';
+import { RegisterTab } from './components/RegisterTab';
+import { LoginTab } from './components/LoginTab';
+import { StudentDashboard } from './components/StudentDashboard';
+import { InspectDrawer } from './components/InspectDrawer';
+import { PhishingDemoModal } from './components/PhishingDemoModal';
+import { checkBackendHealth, getMe, logout as apiLogout } from './lib/api';
+import type { User, CredentialDto, InspectPacket } from './lib/types';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<'signer' | 'verifier'>('signer');
+  const [activeTab, setActiveTab] = useState<'register' | 'login' | 'dashboard'>('register');
+  const [isBackendOnline, setIsBackendOnline] = useState<boolean>(false);
+  const [inspectOpen, setInspectOpen] = useState<boolean>(false);
+  const [phishingOpen, setPhishingOpen] = useState<boolean>(false);
+
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentCredential, setCurrentCredential] = useState<CredentialDto | null>(null);
+  const [packets, setPackets] = useState<InspectPacket[]>([]);
+
+  // Kiểm tra kết nối backend và phiên đăng nhập hiện tại
+  useEffect(() => {
+    const checkStatus = async () => {
+      const health = await checkBackendHealth();
+      setIsBackendOnline(health.isOnline);
+    };
+
+    checkStatus();
+    const timer = setInterval(checkStatus, 8000);
+
+    // Kiểm tra phiên cookie có sẵn
+    getMe().then((res) => {
+      if (res.isSuccess && res.value) {
+        setCurrentUser(res.value);
+      }
+    });
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleRegisterSuccess = (user: User, credential: CredentialDto) => {
+    setCurrentUser(user);
+    setCurrentCredential(credential);
+  };
+
+  const handleLoginSuccess = (user: User) => {
+    setCurrentUser(user);
+    setActiveTab('dashboard');
+  };
+
+  const handleLogout = async () => {
+    await apiLogout();
+    setCurrentUser(null);
+    setCurrentCredential(null);
+    setActiveTab('login');
+  };
+
+  const addInspectPacket = (packet: InspectPacket) => {
+    setPackets((prev) => [...prev, packet]);
+  };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-slate-950">
-      {/* Background radial gradients for subtle modern glow */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-emerald-500/10 rounded-full blur-[130px] opacity-70" />
-        <div className="absolute top-1/2 -right-40 w-[500px] h-[500px] bg-teal-500/5 rounded-full blur-[120px] opacity-50" />
-      </div>
-
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500/30 selection:text-emerald-300">
       {/* Navigation Header */}
-      <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Navbar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        isBackendOnline={isBackendOnline}
+        onOpenInspect={() => setInspectOpen(true)}
+        packetCount={packets.length}
+        user={currentUser}
+        onOpenPhishingDemo={() => setPhishingOpen(true)}
+      />
 
-      {/* Main Content Area */}
-      <main className="flex-1 relative z-10 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-16">
-        {/* Hero Banner / Subtitle */}
-        <div className="text-center mb-10 max-w-3xl mx-auto space-y-3">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-sm shadow-emerald-500/10">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Đồ án An Toàn & Bảo Mật Hệ Thống Thông Tin</span>
-          </div>
+      {/* Main Body */}
+      <main className="flex-1">
+        {activeTab === 'register' && (
+          <RegisterTab
+            onRegisterSuccess={handleRegisterSuccess}
+            onAddInspectPacket={addInspectPacket}
+            onNavigateToLogin={() => setActiveTab('login')}
+            isBackendOnline={isBackendOnline}
+          />
+        )}
 
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white leading-tight">
-            Chữ Ký Số <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">Ed25519</span> &amp; Kiểm Toán Tệp Tin PDF
-          </h1>
+        {activeTab === 'login' && (
+          <LoginTab
+            onLoginSuccess={handleLoginSuccess}
+            onAddInspectPacket={addInspectPacket}
+            onNavigateToRegister={() => setActiveTab('register')}
+            currentUser={currentUser}
+            isBackendOnline={isBackendOnline}
+          />
+        )}
 
-          <p className="text-sm sm:text-base text-slate-400 leading-relaxed">
-            Giải pháp nhúng file gốc nguyên vẹn (PDF Attachment) kết hợp sinh trang chứng thực Audit Trail và mã phản hồi nhanh QR Code. Khắc phục triệt để bẫy PDF serialization, đảm bảo tính toàn vẹn và bất biến 100%.
-          </p>
-
-          {/* Quick Pillars */}
-          <div className="pt-2 flex items-center justify-center flex-wrap gap-4 text-xs text-slate-400">
-            <span className="flex items-center gap-1.5 bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-800">
-              <Cpu className="w-3.5 h-3.5 text-emerald-400" />
-              100% Client-Side Engine
-            </span>
-            <span className="flex items-center gap-1.5 bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-800">
-              <Database className="w-3.5 h-3.5 text-emerald-400" />
-              Bảo toàn Bit-Exact
-            </span>
-            <span className="flex items-center gap-1.5 bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-800">
-              <EyeOff className="w-3.5 h-3.5 text-emerald-400" />
-              Zero Server Uploads
-            </span>
-          </div>
-        </div>
-
-        {/* Dynamic Tab Body */}
-        {activeTab === 'signer' ? <SignerTab /> : <VerifierTab />}
+        {activeTab === 'dashboard' && currentUser && (
+          <StudentDashboard
+            user={currentUser}
+            credential={currentCredential}
+            onLogout={handleLogout}
+            onAddInspectPacket={addInspectPacket}
+          />
+        )}
       </main>
 
-      {/* Modern Footer */}
-      <footer className="relative z-10 border-t border-slate-850 bg-slate-950/80 backdrop-blur-md py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span className="text-slate-400 font-medium">PDF Ed25519 Cryptographic Audit System</span>
-          </div>
-          <div>
-            <span>Công nghệ: React 19 • Tailwind CSS • @noble/curves • pdf-lib • Web Crypto API</span>
-          </div>
+      {/* Footer */}
+      <footer className="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-500">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <span>
+            Đồ án An Toàn & Bảo Mật Hệ Thống Thông Tin • <strong>FIDO2 / WebAuthn Passkeys</strong>
+          </span>
+          <span className="font-mono text-slate-600">
+            Tech Stack: ASP.NET Core 9 • Fido2-net-lib • React 19 • Tailwind CSS
+          </span>
         </div>
       </footer>
+
+      {/* Inspect Data Drawer */}
+      <InspectDrawer
+        isOpen={inspectOpen}
+        onClose={() => setInspectOpen(false)}
+        packets={packets}
+        onClearPackets={() => setPackets([])}
+      />
+
+      {/* Phishing Scenario Demo Modal */}
+      <PhishingDemoModal
+        isOpen={phishingOpen}
+        onClose={() => setPhishingOpen(false)}
+      />
     </div>
   );
 }
