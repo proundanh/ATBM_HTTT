@@ -16,6 +16,17 @@ public interface ISecurityLogService
         string? studentCodeAttempted = null);
 
     /// <summary>
+    /// Ghi và lưu ngay lập tức log thành công vào cơ sở dữ liệu (ví dụ Logout)
+    /// </summary>
+    Task WriteSuccessLogAsync(
+        SecurityEventType eventType,
+        Guid? userId,
+        byte[]? credentialId = null,
+        string? deviceName = null,
+        long? signCountUsed = null,
+        string? studentCodeAttempted = null);
+
+    /// <summary>
     /// Ghi và lưu ngay lập tức log thất bại vào cơ sở dữ liệu
     /// </summary>
     Task WriteFailureLogAsync(

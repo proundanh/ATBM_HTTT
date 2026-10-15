@@ -55,6 +55,10 @@ public record ConflictError(string Message, string Code = "Conflict")
 public record ForbiddenError(string Message, string Code = "Forbidden")
     : Error(Code, Message);
 
+/// <summary>The caller is not authenticated — maps to HTTP 401.</summary>
+public record UnauthorizedError(string Message, string Code = "Unauthorized")
+    : Error(Code, Message);
+
 /// <summary>A catch-all for unexpected domain failures — maps to HTTP 400.</summary>
 public record BadError(string Message, string Code = "BadRequest")
     : Error(Code, Message);
