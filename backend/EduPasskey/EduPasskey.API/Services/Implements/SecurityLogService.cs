@@ -28,6 +28,19 @@ public class SecurityLogService : ISecurityLogService
         // Không gọi SaveChangesAsync() ở đây để handler chính commit chung 1 Transaction với nghiệp vụ
     }
 
+    public async Task WriteSuccessLogAsync(
+        SecurityEventType eventType,
+        Guid? userId,
+        byte[]? credentialId = null,
+        string? deviceName = null,
+        long? signCountUsed = null,
+        string? studentCodeAttempted = null)
+    {
+        var log = CreateBaseLog(eventType, isSuccess: true, userId, credentialId, deviceName, signCountUsed, studentCodeAttempted);
+        await _db.SecurityLogs.AddAsync(log);
+        await _db.SaveChangesAsync();
+    }
+
     public async Task WriteFailureLogAsync(
         SecurityEventType eventType,
         string failureReason,

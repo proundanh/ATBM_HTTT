@@ -69,6 +69,7 @@ public static class ResultExtensions
         error switch
         {
             NotFoundError => StatusCodes.Status404NotFound,
+            UnauthorizedError => StatusCodes.Status401Unauthorized,
             ConflictError => StatusCodes.Status409Conflict,
             ForbiddenError => StatusCodes.Status403Forbidden,
             ValidationError => StatusCodes.Status400BadRequest,
