@@ -8,7 +8,6 @@ import {
   AlertCircle,
   Loader2,
   Shield,
-  Sparkles,
   ArrowRight,
   Info,
 } from 'lucide-react';
@@ -82,7 +81,7 @@ export const RegisterTab = ({
     try {
       // BƯỚC 1: Lấy Challenge & Options từ Backend C#
       setCurrentStep(1);
-      setStepMessage('Đang yêu cầu máy chủ sinh Challenge bảo mật một lần (TTL: 120s)...');
+      setStepMessage('Đang yêu cầu máy chủ sinh Challenge bảo mật (TTL: 120s)...');
 
       const optionsRes = await requestRegisterOptions({
         studentCode: sCode,
@@ -93,25 +92,21 @@ export const RegisterTab = ({
       if (!optionsRes.isSuccess || !optionsRes.value) {
         throw new Error(
           optionsRes.error?.message ||
-            'Không thể lấy thông tin đăng ký từ máy chủ. Hãy kiểm tra lại kết nối Backend.'
+            'Không thể lấy thông tin đăng ký từ máy chủ. Hãy kiểm tra kết nối Backend.'
         );
       }
 
       const { ceremonyId, options } = optionsRes.value;
 
-      // Ghi nhận gói tin 1 vào Inspect Data
       onAddInspectPacket({
-        id: `pkt-${Date.now()}-1`,
+        id: `pkt-${Date.now()}-reg-1`,
         title: 'Bước 1: Server -> Client (Register Options)',
         timestamp: new Date().toLocaleTimeString(),
         flow: 'register',
         phase: 'Server Options',
-        data: {
-          ceremonyId,
-          options,
-        },
+        data: { ceremonyId, options },
         notes:
-          'Máy chủ Fido2-net-lib sinh ra Challenge ngẫu nhiên chống tấn công Replay và cấu hình residentKey=required để hỗ trợ Passkey một chạm.',
+          'Máy chủ Fido2-net-lib sinh Challenge ngẫu nhiên chống tấn công Replay và cấu hình residentKey=required.',
       });
 
       // BƯỚC 2: Gọi WebAuthn Browser API (Cảm biến sinh trắc học thiết bị)
@@ -120,31 +115,24 @@ export const RegisterTab = ({
 
       const credential = await startPasskeyRegistration(options);
 
-      // Giải mã clientDataJSON để hiển thị rõ ràng trong Inspect
       let decodedClientData = null;
       try {
         if (credential.response?.clientDataJSON) {
-          decodedClientData = JSON.parse(
-            decodeBase64UrlToString(credential.response.clientDataJSON)
-          );
+          decodedClientData = JSON.parse(decodeBase64UrlToString(credential.response.clientDataJSON));
         }
       } catch {
         // fallback
       }
 
-      // Ghi nhận gói tin 2 vào Inspect Data
       onAddInspectPacket({
-        id: `pkt-${Date.now()}-2`,
-        title: 'Bước 2: Client Authenticator -> Browser (Attestation Credential)',
+        id: `pkt-${Date.now()}-reg-2`,
+        title: 'Bước 2: Authenticator -> Client (Attestation Credential)',
         timestamp: new Date().toLocaleTimeString(),
         flow: 'register',
         phase: 'Client Authenticator',
-        data: {
-          credential,
-          decodedClientData,
-        },
+        data: { credential, decodedClientData },
         notes:
-          'Thiết bị đã sinh cặp khóa (ES256 ECDSA P-256). Khóa riêng (Private Key) được giữ an toàn trong TPM/Secure Enclave. Khóa công khai (Public Key) đóng gói trong attestationObject gửi lên server.',
+          'Thiết bị đã sinh cặp khóa (ES256 ECDSA P-256). Khóa riêng (Private Key) được giữ trong TPM/Secure Enclave. Khóa công khai đóng gói trong attestationObject gửi lên server.',
       });
 
       // BƯỚC 3: Gửi Credential lên Backend để xác minh chữ ký & lưu Public Key
@@ -158,22 +146,18 @@ export const RegisterTab = ({
       });
 
       if (!verifyRes.isSuccess || !verifyRes.value) {
-        throw new Error(
-          verifyRes.error?.message ||
-            'Xác thực thông tin Passkey thất bại. Vui lòng thử lại.'
-        );
+        throw new Error(verifyRes.error?.message || 'Xác thực thông tin Passkey thất bại.');
       }
 
-      // Ghi nhận gói tin 3 vào Inspect Data
       onAddInspectPacket({
-        id: `pkt-${Date.now()}-3`,
+        id: `pkt-${Date.now()}-reg-3`,
         title: 'Bước 3: Server Verify Success (+ Cấp Cookie Session)',
         timestamp: new Date().toLocaleTimeString(),
         flow: 'register',
         phase: 'Server Verify Result',
         data: verifyRes.value,
         notes:
-          'Server đã xác minh chữ ký FIDO2 thành công, lưu Public Key vào bảng StoredCredentials (không lưu mật khẩu!) và thiết lập Cookie xác thực HttpOnly StudentPortal.Auth.',
+          'Server đã xác minh chữ ký FIDO2 thành công, lưu Public Key vào bảng StoredCredentials (không lưu mật khẩu!) và cấp Cookie xác thực StudentPortal.Auth.',
       });
 
       setRegisteredResult(verifyRes.value);
@@ -188,28 +172,27 @@ export const RegisterTab = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6">
-      {/* Top Banner Notice */}
-      <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 to-slate-900 border border-emerald-500/20 shadow-lg">
+    <div className="max-w-2xl mx-auto py-10 px-4 sm:px-6">
+      {/* Informative Header Banner */}
+      <div className="mb-6 p-4 rounded-xl bg-white border border-gray-200 shadow-xs">
         <div className="flex items-start space-x-3">
-          <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-400 border border-emerald-500/30 shrink-0">
+          <div className="p-2 bg-blue-50 text-blue-600 rounded-lg shrink-0">
             <Shield className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-white flex items-center space-x-2">
-              <span>Đăng Ký Tài Khoản Không Dùng Mật Khẩu (Passwordless)</span>
-              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-mono border border-emerald-500/30">
+            <h3 className="text-sm font-semibold text-gray-900 flex items-center space-x-2">
+              <span>Đăng Ký Tài Khoản Bằng Passkey (Không Mật Khẩu)</span>
+              <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-mono border border-blue-200">
                 ES256 / FIDO2
               </span>
             </h3>
-            <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-              Hệ thống tạo cặp khóa mật mã học <strong>Public/Private Key</strong> trực tiếp trên thiết bị của bạn.
-              Khóa bí mật được lưu trong chip bảo mật <strong>TPM / Secure Enclave</strong> và không bao giờ rời khỏi máy.
-              Cơ sở dữ liệu của trường học <strong>hoàn toàn không có cột Password</strong>, loại bỏ 100% rủi ro lộ lọt mật khẩu.
+            <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+              Khóa bí mật được tạo và lưu trực tiếp trong chip phần cứng an toàn <strong>TPM / Secure Enclave</strong> trên thiết bị của bạn.
+              Cơ sở dữ liệu nhà trường <strong>hoàn toàn không lưu mật khẩu</strong>, triệt tiêu 100% rủi ro bị lộ mật khẩu hay phishing.
             </p>
             {deviceCapability && (
-              <div className="mt-2.5 flex items-center space-x-2 text-xs text-emerald-400/90 font-medium">
-                <Sparkles className="w-3.5 h-3.5" />
+              <div className="mt-2 text-xs text-emerald-700 font-medium flex items-center space-x-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>{deviceCapability.summary}</span>
               </div>
             )}
@@ -218,76 +201,76 @@ export const RegisterTab = ({
       </div>
 
       {!isBackendOnline && (
-        <div className="mb-6 p-3.5 rounded-xl bg-amber-950/30 border border-amber-500/30 text-amber-200 text-xs flex items-center space-x-2.5">
-          <Info className="w-4 h-4 text-amber-400 shrink-0" />
+        <div className="mb-6 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center space-x-2.5">
+          <Info className="w-4 h-4 text-amber-600 shrink-0" />
           <span>
-            <strong>Lưu ý:</strong> Máy chủ Backend (.NET) chưa khởi động ở cổng <code>5105</code>. Bạn hãy chạy{' '}
-            <code className="bg-amber-900/40 px-1 py-0.5 rounded text-amber-300">dotnet run</code> trong thư mục backend để API xử lý xác thực FIDO2.
+            <strong>Lưu ý:</strong> Máy chủ Backend (.NET) chưa khởi động ở cổng <code>5105</code>. Vui lòng chạy{' '}
+            <code className="bg-amber-100 px-1 py-0.5 rounded text-amber-900">dotnet run</code> trong thư mục backend.
           </span>
         </div>
       )}
 
       {/* Main Container */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl shadow-xl overflow-hidden backdrop-blur-sm">
+      <div className="bg-white border border-gray-200 rounded-xl shadow-xs overflow-hidden">
         {registeredResult ? (
           /* SUCCESS VIEW */
           <div className="p-8 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/20">
-              <CheckCircle2 className="w-9 h-9" />
+            <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-8 h-8" />
             </div>
 
-            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 mb-3">
-              Tạo Passkey Thành Công
+            <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 mb-2">
+              Đăng Ký Passkey Thành Công
             </span>
 
-            <h2 className="text-xl font-bold text-white mb-2">
+            <h2 className="text-lg font-bold text-gray-900 mb-1">
               Chào mừng, {registeredResult.user.fullName}!
             </h2>
 
-            <p className="text-sm text-slate-300 max-w-lg mx-auto mb-6">
-              Tài khoản sinh viên <strong>{registeredResult.user.studentCode}</strong> đã được liên kết với khóa sinh trắc học trên thiết bị của bạn.
+            <p className="text-xs text-gray-600 max-w-md mx-auto mb-6 leading-relaxed">
+              Tài khoản <strong>{registeredResult.user.studentCode}</strong> đã được bảo vệ bằng chuẩn bảo mật W3C WebAuthn trên thiết bị này.
             </p>
 
-            <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-5 max-w-lg mx-auto text-left mb-6 space-y-2.5 text-xs font-mono">
-              <div className="flex justify-between border-b border-slate-800/80 pb-2">
-                <span className="text-slate-400">Mã số sinh viên:</span>
-                <span className="text-emerald-400 font-bold">{registeredResult.user.studentCode}</span>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-w-md mx-auto text-left mb-6 space-y-2 text-xs">
+              <div className="flex justify-between border-b border-gray-200 pb-1.5">
+                <span className="text-gray-500">Mã số sinh viên:</span>
+                <span className="text-gray-900 font-mono font-semibold">{registeredResult.user.studentCode}</span>
               </div>
-              <div className="flex justify-between border-b border-slate-800/80 pb-2">
-                <span className="text-slate-400">Thiết bị bảo mật:</span>
-                <span className="text-slate-200">{registeredResult.credential.deviceName}</span>
+              <div className="flex justify-between border-b border-gray-200 pb-1.5">
+                <span className="text-gray-500">Thiết bị liên kết:</span>
+                <span className="text-gray-900">{registeredResult.credential.deviceName}</span>
               </div>
-              <div className="flex justify-between border-b border-slate-800/80 pb-2">
-                <span className="text-slate-400">Credential ID:</span>
-                <span className="text-slate-300 truncate max-w-[240px]">{registeredResult.credential.id}</span>
+              <div className="flex justify-between border-b border-gray-200 pb-1.5">
+                <span className="text-gray-500">Credential ID:</span>
+                <span className="text-gray-600 font-mono text-[11px] truncate max-w-[220px]">{registeredResult.credential.id}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Cơ chế bảo vệ:</span>
-                <span className="text-teal-400 font-semibold">WebAuthn ES256 (P-256 + SHA256)</span>
+                <span className="text-gray-500">Cơ chế xác thực:</span>
+                <span className="text-blue-700 font-medium">ES256 (ECDSA P-256 + SHA-256)</span>
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row justify-center items-center gap-3">
+            <div className="flex flex-col sm:flex-row justify-center items-center gap-2.5">
               {onNavigateToDashboard && (
                 <button
                   onClick={onNavigateToDashboard}
-                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-bold text-sm transition-all shadow-lg shadow-emerald-500/25 flex items-center justify-center space-x-2"
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs transition-colors flex items-center justify-center space-x-1.5 shadow-xs"
                 >
-                  <span>Vào Cổng Sinh Viên Ngay</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <span>Vào Cổng Sinh Viên</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               )}
 
               <button
                 onClick={onNavigateToLogin}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm transition-all flex items-center justify-center space-x-2 border border-slate-700"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-lg bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 font-medium text-xs transition-colors"
               >
                 <span>Thử Đăng Nhập Lại</span>
               </button>
 
               <button
                 onClick={() => setRegisteredResult(null)}
-                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-400 text-sm font-medium transition-all"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-lg text-gray-500 hover:text-gray-800 text-xs transition-colors"
               >
                 Đăng ký tài khoản khác
               </button>
@@ -295,35 +278,35 @@ export const RegisterTab = ({
           </div>
         ) : (
           /* FORM VIEW */
-          <form onSubmit={handleRegister} className="p-6 sm:p-8">
-            <div className="border-b border-slate-800 pb-5 mb-6">
-              <h2 className="text-lg font-bold text-white flex items-center space-x-2">
-                <Fingerprint className="w-5 h-5 text-emerald-400" />
-                <span>Thông Tin Sinh Viên & Khởi Tạo Passkey</span>
+          <form onSubmit={handleRegister} className="p-6 sm:p-7">
+            <div className="border-b border-gray-200 pb-4 mb-6">
+              <h2 className="text-base font-bold text-gray-900 flex items-center space-x-2">
+                <Fingerprint className="w-5 h-5 text-blue-600" />
+                <span>Thông Tin Sinh Viên & Khởi Tạo Khóa</span>
               </h2>
-              <p className="text-xs text-slate-400 mt-1">
-                Điền thông tin định danh sinh viên để kích hoạt cảm biến vân tay / khuôn mặt trên máy tính hoặc điện thoại.
+              <p className="text-xs text-gray-500 mt-1">
+                Điền thông tin định danh sinh viên để kích hoạt cảm biến sinh trắc học trên thiết bị này.
               </p>
             </div>
 
             {errorMessage && (
-              <div className="mb-6 p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs flex items-start space-x-2.5">
-                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <div className="mb-5 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start space-x-2.5">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                 <div>
-                  <div className="font-semibold text-rose-200">Đăng ký không thành công</div>
+                  <div className="font-semibold text-rose-900">Đăng ký không thành công</div>
                   <div className="mt-0.5">{errorMessage}</div>
                 </div>
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
               {/* MSSV */}
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Mã số sinh viên (MSSV) <span className="text-emerald-400">*</span>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                  Mã số sinh viên (MSSV) <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                     <UserIcon className="w-4 h-4" />
                   </div>
                   <input
@@ -332,19 +315,18 @@ export const RegisterTab = ({
                     value={studentCode}
                     onChange={(e) => setStudentCode(e.target.value.toUpperCase())}
                     placeholder="VD: SV001"
-                    className="w-full pl-9 pr-3 py-2.5 bg-slate-950/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 font-mono"
+                    className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-mono transition-all"
                   />
                 </div>
-                <span className="text-[11px] text-slate-500 mt-1 block">Mã định danh duy nhất của sinh viên</span>
               </div>
 
               {/* Full Name */}
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Họ và tên <span className="text-emerald-400">*</span>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                  Họ và tên <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                     <UserIcon className="w-4 h-4" />
                   </div>
                   <input
@@ -353,18 +335,18 @@ export const RegisterTab = ({
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="VD: Nguyễn Văn A"
-                    className="w-full pl-9 pr-3 py-2.5 bg-slate-950/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                    className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
                   />
                 </div>
               </div>
 
               {/* Email */}
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Email sinh viên <span className="text-emerald-400">*</span>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                  Email sinh viên <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                     <Mail className="w-4 h-4" />
                   </div>
                   <input
@@ -373,18 +355,18 @@ export const RegisterTab = ({
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="VD: sv001@school.edu.vn"
-                    className="w-full pl-9 pr-3 py-2.5 bg-slate-950/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                    className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
                   />
                 </div>
               </div>
 
               {/* Device Name */}
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">
                   Tên thiết bị liên kết Passkey
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                     <Laptop className="w-4 h-4" />
                   </div>
                   <input
@@ -392,28 +374,27 @@ export const RegisterTab = ({
                     value={deviceName}
                     onChange={(e) => setDeviceName(e.target.value)}
                     placeholder="VD: Windows Hello (Laptop)"
-                    className="w-full pl-9 pr-3 py-2.5 bg-slate-950/70 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                    className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
                   />
                 </div>
-                <span className="text-[11px] text-slate-500 mt-1 block">Tên hiển thị trong danh sách thiết bị tin cậy</span>
               </div>
             </div>
 
             {/* Stepper info during loading */}
             {loading && (
-              <div className="mb-6 p-4 rounded-xl bg-slate-950/80 border border-emerald-500/30 text-xs">
-                <div className="flex items-center space-x-3 mb-3">
-                  <Loader2 className="w-5 h-5 text-emerald-400 animate-spin shrink-0" />
-                  <span className="text-emerald-300 font-semibold">{stepMessage}</span>
+              <div className="mb-5 p-3.5 rounded-lg bg-blue-50/70 border border-blue-200 text-xs">
+                <div className="flex items-center space-x-2.5 mb-2.5">
+                  <Loader2 className="w-4 h-4 text-blue-600 animate-spin shrink-0" />
+                  <span className="text-blue-900 font-medium">{stepMessage}</span>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
-                  <div className={`p-2 rounded-lg border ${currentStep >= 1 ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400 font-bold' : 'border-slate-800 text-slate-600'}`}>
+                  <div className={`p-1.5 rounded border ${currentStep >= 1 ? 'border-blue-400 bg-white text-blue-800 font-semibold' : 'border-gray-200 text-gray-400'}`}>
                     1. Challenge Options
                   </div>
-                  <div className={`p-2 rounded-lg border ${currentStep >= 2 ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400 font-bold' : 'border-slate-800 text-slate-600'}`}>
+                  <div className={`p-1.5 rounded border ${currentStep >= 2 ? 'border-blue-400 bg-white text-blue-800 font-semibold' : 'border-gray-200 text-gray-400'}`}>
                     2. Chạm Sinh Trắc Học
                   </div>
-                  <div className={`p-2 rounded-lg border ${currentStep >= 3 ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400 font-bold' : 'border-slate-800 text-slate-600'}`}>
+                  <div className={`p-1.5 rounded border ${currentStep >= 3 ? 'border-blue-400 bg-white text-blue-800 font-semibold' : 'border-gray-200 text-gray-400'}`}>
                     3. Lưu Public Key
                   </div>
                 </div>
@@ -424,27 +405,27 @@ export const RegisterTab = ({
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-bold text-sm sm:text-base transition-all duration-200 shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+              className="w-full py-2.5 px-4 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-medium text-sm transition-colors shadow-xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   <span>Đang kết nối cảm biến sinh trắc học...</span>
                 </>
               ) : (
                 <>
-                  <Fingerprint className="w-5 h-5 stroke-[2.2]" />
+                  <Fingerprint className="w-4 h-4" />
                   <span>Tạo Tài Khoản & Kích Hoạt Passkey</span>
                 </>
               )}
             </button>
 
             <div className="mt-4 text-center">
-              <span className="text-xs text-slate-400">Đã có tài khoản Passkey trên thiết bị này? </span>
+              <span className="text-xs text-gray-500">Đã có tài khoản Passkey trên thiết bị này? </span>
               <button
                 type="button"
                 onClick={onNavigateToLogin}
-                className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold underline underline-offset-2 ml-1"
+                className="text-xs text-blue-600 hover:text-blue-800 font-semibold underline underline-offset-2 ml-1"
               >
                 Chuyển sang Đăng nhập ngay
               </button>

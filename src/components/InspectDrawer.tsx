@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { X, Copy, Check, Eye, Terminal, Shield } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Copy, Check, Eye, Terminal, ShieldCheck, ChevronRight } from 'lucide-react';
 import type { InspectPacket } from '../lib/types';
 
 interface InspectDrawerProps {
@@ -18,6 +18,16 @@ export const InspectDrawer = ({
   const [selectedPacketId, setSelectedPacketId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const currentPacket =
@@ -31,22 +41,22 @@ export const InspectDrawer = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/70 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-2xl bg-slate-900 border-l border-slate-800 h-full flex flex-col shadow-2xl">
+    <div className="fixed inset-0 z-50 flex justify-end bg-gray-900/40 backdrop-blur-xs animate-fade-in">
+      <div className="w-full max-w-2xl bg-white border-l border-gray-200 h-full flex flex-col shadow-2xl text-gray-900">
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
-          <div className="flex items-center space-x-2.5">
-            <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-400 border border-indigo-500/20">
-              <Terminal className="w-5 h-5" />
+        <div className="p-4 sm:p-5 border-b border-gray-200 flex items-center justify-between bg-gray-50/70">
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center">
+              <Terminal className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h2 className="text-sm font-bold text-white">Thanh Tra Gói Tin FIDO2 / WebAuthn</h2>
-                <span className="text-[10px] bg-indigo-500/20 text-indigo-300 font-mono px-2 py-0.5 rounded-full border border-indigo-500/30">
+                <h2 className="text-sm font-bold text-gray-900">Thanh Tra Gói Tin FIDO2 / WebAuthn</h2>
+                <span className="text-[10px] bg-blue-50 text-blue-700 font-mono px-2 py-0.5 rounded-full border border-blue-200">
                   Inspect Data
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-gray-500">
                 Hiển thị cấu trúc JSON thực tế trao đổi giữa Trình duyệt và Server C#
               </p>
             </div>
@@ -56,14 +66,14 @@ export const InspectDrawer = ({
             {packets.length > 0 && (
               <button
                 onClick={onClearPackets}
-                className="text-xs text-slate-400 hover:text-slate-200 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
+                className="text-xs text-gray-500 hover:text-gray-900 px-2.5 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors cursor-pointer"
               >
                 Xóa lịch sử
               </button>
             )}
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -73,14 +83,14 @@ export const InspectDrawer = ({
         {/* Content Body */}
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
           {/* Left: Packets list */}
-          <div className="w-full md:w-5/12 border-b md:border-b-0 md:border-r border-slate-800 overflow-y-auto p-3 space-y-2 bg-slate-950/30">
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1">
+          <div className="w-full md:w-5/12 border-b md:border-b-0 md:border-r border-gray-200 overflow-y-auto p-3 space-y-2 bg-gray-50/40">
+            <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider px-2 py-1">
               Gói tin đã bắt ({packets.length})
             </div>
 
             {packets.length === 0 ? (
-              <div className="p-4 text-center text-xs text-slate-500">
-                Chưa có gói tin nào. Hãy thực hiện Đăng ký hoặc Đăng nhập để quan sát luồng trao đổi.
+              <div className="p-6 text-center text-xs text-gray-500">
+                Chưa có gói tin nào. Hãy thực hiện Đăng ký, Đăng nhập hoặc Step-Up để quan sát luồng trao đổi.
               </div>
             ) : (
               packets.map((pkt) => {
@@ -89,17 +99,20 @@ export const InspectDrawer = ({
                   <div
                     key={pkt.id}
                     onClick={() => setSelectedPacketId(pkt.id)}
-                    className={`p-3 rounded-xl cursor-pointer text-xs transition-all border ${
+                    className={`p-3 rounded-lg cursor-pointer text-xs transition-all border ${
                       isSelected
-                        ? 'bg-indigo-950/60 border-indigo-500/50 text-white shadow-md'
-                        : 'bg-slate-900/60 border-slate-800/80 text-slate-300 hover:bg-slate-800/60'
+                        ? 'bg-blue-50 border-blue-300 text-blue-900 shadow-xs'
+                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
-                      <span className="font-mono text-indigo-400">{pkt.phase}</span>
+                    <div className="flex items-center justify-between text-[10px] text-gray-400 mb-1">
+                      <span className="font-mono font-medium text-blue-600">{pkt.phase}</span>
                       <span>{pkt.timestamp}</span>
                     </div>
-                    <div className="font-semibold truncate">{pkt.title}</div>
+                    <div className="font-semibold text-gray-900 truncate flex items-center justify-between">
+                      <span>{pkt.title}</span>
+                      {isSelected && <ChevronRight className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                    </div>
                   </div>
                 );
               })
@@ -107,27 +120,27 @@ export const InspectDrawer = ({
           </div>
 
           {/* Right: Packet Details & JSON viewer */}
-          <div className="flex-1 flex flex-col overflow-hidden p-4 bg-slate-900/40">
+          <div className="flex-1 flex flex-col overflow-hidden p-4 bg-white">
             {currentPacket ? (
               <>
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <h3 className="text-xs font-bold text-white flex items-center space-x-1.5">
-                      <span>{currentPacket.title}</span>
+                    <h3 className="text-xs font-bold text-gray-900">
+                      {currentPacket.title}
                     </h3>
-                    <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                      Thời điểm: {currentPacket.timestamp}
+                    <div className="text-[11px] text-gray-500 font-mono mt-0.5">
+                      Thời điểm ghi nhận: {currentPacket.timestamp}
                     </div>
                   </div>
 
                   <button
                     onClick={handleCopyJson}
-                    className="flex items-center space-x-1 text-xs px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700"
+                    className="flex items-center space-x-1 text-xs px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors border border-gray-200 cursor-pointer"
                   >
                     {copied ? (
                       <>
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="text-emerald-400 font-bold">Đã Copy</span>
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="text-emerald-700 font-bold">Đã Copy</span>
                       </>
                     ) : (
                       <>
@@ -139,21 +152,21 @@ export const InspectDrawer = ({
                 </div>
 
                 {currentPacket.notes && (
-                  <div className="p-3 rounded-xl bg-indigo-950/30 border border-indigo-500/20 text-xs text-indigo-200 mb-3 flex items-start space-x-2">
-                    <Shield className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-                    <p className="leading-relaxed">{currentPacket.notes}</p>
+                  <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-900 mb-3 flex items-start space-x-2">
+                    <ShieldCheck className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" />
+                    <p className="leading-relaxed text-[11px]">{currentPacket.notes}</p>
                   </div>
                 )}
 
                 {/* JSON Display */}
-                <div className="flex-1 overflow-auto rounded-xl bg-slate-950 border border-slate-800 p-3 font-mono text-[11px] text-emerald-400/90 leading-relaxed shadow-inner">
+                <div className="flex-1 overflow-auto rounded-lg bg-gray-900 border border-gray-800 p-3.5 font-mono text-[11px] text-emerald-400 leading-relaxed shadow-inner">
                   <pre className="whitespace-pre-wrap break-all">
                     {JSON.stringify(currentPacket.data, null, 2)}
                   </pre>
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex items-center justify-center text-xs text-slate-500">
+              <div className="flex-1 flex items-center justify-center text-xs text-gray-400">
                 Chọn một gói tin bên trái để xem chi tiết
               </div>
             )}
@@ -161,13 +174,13 @@ export const InspectDrawer = ({
         </div>
 
         {/* Footer Explanation for Presentation */}
-        <div className="p-4 border-t border-slate-800 bg-slate-950/80 text-[11px] text-slate-400 space-y-1">
-          <div className="font-semibold text-slate-300 flex items-center space-x-1.5">
-            <Eye className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Mục đích Thuyết trình Đồ án:</span>
+        <div className="p-4 border-t border-gray-200 bg-gray-50/70 text-[11px] text-gray-600 space-y-1">
+          <div className="font-semibold text-gray-900 flex items-center space-x-1.5">
+            <Eye className="w-3.5 h-3.5 text-blue-600" />
+            <span>Mục đích Thuyết trình & Bảo vệ Đồ án:</span>
           </div>
-          <p>
-            Giảng viên có thể kiểm tra trực tiếp chuỗi <strong>challenge</strong> dùng một lần (ngăn chặn Replay Attack),
+          <p className="leading-relaxed">
+            Hội đồng có thể kiểm tra trực tiếp chuỗi <strong>challenge</strong> dùng một lần (ngăn chặn Replay Attack),
             chuỗi <strong>origin</strong> trong <code>clientDataJSON</code> (chống Phishing), và thuật toán ký <strong>ES256 (COSE alg: -7)</strong>.
           </p>
         </div>
