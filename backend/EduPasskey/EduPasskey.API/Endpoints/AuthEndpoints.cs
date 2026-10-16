@@ -58,5 +58,19 @@ public class AuthEndpoints : IEndpointGroup
             var result = await sender.Send(new GetMeQuery(), ct);
             return result.ToHttpResult();
         });
+
+        // 7. POST /api/v1/auth/stepup/options
+        group.MapPost("stepup/options", async (EduPasskey.API.Features.Auth.Commands.StepUpOptions.StepUpOptionsCommand command, ISender sender, CancellationToken ct) =>
+        {
+            var result = await sender.Send(command, ct);
+            return result.ToHttpResult();
+        }).RequireAuthorization();
+
+        // 8. POST /api/v1/auth/stepup/verify
+        group.MapPost("stepup/verify", async (EduPasskey.API.Features.Auth.Commands.StepUpVerify.StepUpVerifyCommand command, ISender sender, CancellationToken ct) =>
+        {
+            var result = await sender.Send(command, ct);
+            return result.ToHttpResult();
+        }).RequireAuthorization();
     }
 }

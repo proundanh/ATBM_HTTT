@@ -1,4 +1,4 @@
-﻿using EduPasskey.API.Logging;
+using EduPasskey.API.Logging;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -31,13 +31,17 @@ public static class HostExtensions
             try
             {
                 logger.LogInformation("Migrating postgres database.");
-                await ExecuteMigrations(context);
+                if (context != null)
+                {
+                    await ExecuteMigrations(context);
+                    await SeedAdminUserAsync(context);
+                }
                 logger.LogInformation("Migrated postgres database.");
 
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "An error occurred while migrating the mysql database");
+                logger.LogError(ex, "An error occurred while migrating the database");
             }
         }
 
@@ -48,5 +52,29 @@ public static class HostExtensions
        where TContext : DbContext
     {
         return context.Database.MigrateAsync();
+    }
+
+    private static async Task SeedAdminUserAsync<TContext>(TContext context)
+        where TContext : DbContext
+    {
+        if (context is EduPasskey.API.Data.AppDbContext dbContext)
+        {
+            var hasAdmin = await dbContext.Users.AnyAsync(u => u.Role == EduPasskey.API.Entities.UserRole.Admin);
+            if (!hasAdmin)
+            {
+                var admin = new EduPasskey.API.Entities.User
+                {
+                    Id = Guid.NewGuid(),
+                    StudentCode = "ADMIN001",
+                    FullName = "Quản trị viên Hệ thống",
+                    Email = "admin@school.edu.vn",
+                    Role = EduPasskey.API.Entities.UserRole.Admin,
+                    IsActive = true,
+                    WebAuthnUserId = Guid.NewGuid().ToByteArray()
+                };
+                await dbContext.Users.AddAsync(admin);
+                await dbContext.SaveChangesAsync();
+            }
+        }
     }
 }
