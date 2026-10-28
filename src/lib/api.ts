@@ -96,7 +96,7 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
 export async function checkBackendHealth(): Promise<{ isOnline: boolean; message: string }> {
   try {
     const baseUrl = getBaseApiUrl();
-    const target = baseUrl ? `${baseUrl}/` : '/';
+    const target = baseUrl ? `${baseUrl}/api/v1/auth/me` : '/api/v1/auth/me';
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 2500);
 
@@ -107,7 +107,7 @@ export async function checkBackendHealth(): Promise<{ isOnline: boolean; message
     });
     clearTimeout(timeoutId);
 
-    if (res.ok || res.status === 404 || res.status === 302 || res.status === 200) {
+    if (res.ok || res.status === 401 || res.status === 200) {
       return { isOnline: true, message: 'Backend .NET đang hoạt động' };
     }
     return { isOnline: false, message: `Mã phản hồi HTTP: ${res.status}` };

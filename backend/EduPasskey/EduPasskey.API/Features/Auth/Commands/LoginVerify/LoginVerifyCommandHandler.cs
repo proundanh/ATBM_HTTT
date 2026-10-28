@@ -157,9 +157,16 @@ public class LoginVerifyCommandHandler(
         var httpContext = httpContextAccessor.HttpContext;
         if (httpContext != null)
         {
+            var authProperties = new AuthenticationProperties
+            {
+                IsPersistent = true,
+                ExpiresUtc = DateTimeOffset.UtcNow.AddHours(2)
+            };
+
             await httpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,
-                new ClaimsPrincipal(identity));
+                new ClaimsPrincipal(identity),
+                authProperties);
         }
 
         logger.LogInformation("User {StudentCode} logged in successfully.", user.StudentCode);

@@ -102,18 +102,30 @@ public static class ServiceExtensions
                 options.ExpireTimeSpan = TimeSpan.FromHours(2);
                 options.SlidingExpiration = true;
 
-                // Với Web API, khi chưa đăng nhập trả về mã 401 thay vì Redirect 302 của MVC
-                options.Events.OnRedirectToLogin = context =>
+                // Với Web API, khi chưa đăng nhập trả về mã 401 JSON thay vì Redirect 302 của MVC
+                options.Events.OnRedirectToLogin = async context =>
                 {
                     context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                    return Task.CompletedTask;
+                    context.Response.ContentType = "application/json";
+                    await context.Response.WriteAsJsonAsync(new
+                    {
+                        isSuccess = false,
+                        isFailure = true,
+                        error = new { code = "UNAUTHORIZED", message = "Phiên đăng nhập đã hết hạn hoặc chưa đăng nhập." }
+                    });
                 };
 
                 // Khi không đủ quyền (Role), trả về 403 Forbidden thay vì Redirect 302
-                options.Events.OnRedirectToAccessDenied = context =>
+                options.Events.OnRedirectToAccessDenied = async context =>
                 {
                     context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                    return Task.CompletedTask;
+                    context.Response.ContentType = "application/json";
+                    await context.Response.WriteAsJsonAsync(new
+                    {
+                        isSuccess = false,
+                        isFailure = true,
+                        error = new { code = "FORBIDDEN", message = "Bạn không có quyền thực hiện hành động này." }
+                    });
                 };
             });
 

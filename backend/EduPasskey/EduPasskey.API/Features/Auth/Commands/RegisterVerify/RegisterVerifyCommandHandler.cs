@@ -121,9 +121,16 @@ public class RegisterVerifyCommandHandler(
         var httpContext = httpContextAccessor.HttpContext;
         if (httpContext != null)
         {
+            var authProperties = new AuthenticationProperties
+            {
+                IsPersistent = true,
+                ExpiresUtc = DateTimeOffset.UtcNow.AddHours(2)
+            };
+
             await httpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,
-                new ClaimsPrincipal(identity));
+                new ClaimsPrincipal(identity),
+                authProperties);
         }
         logger.LogInformation("SUCCESS: User {StudentCode} registered successfully with Credential {CredId}", user.StudentCode, credential.Id);
         // 9. Trả về Response theo đúng đặc tả
