@@ -81,7 +81,7 @@ public static class ServiceExtensions
         {
             options.AddDefaultPolicy(builder =>
             {
-                builder.WithOrigins("http://localhost:5173")
+                builder.SetIsOriginAllowed(_ => true)
                     .AllowAnyMethod()
                     .AllowCredentials()
                     .AllowAnyHeader();
