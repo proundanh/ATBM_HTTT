@@ -49,10 +49,17 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
       },
     });
 
+    // 204 No Content / 205 Reset Content không có response body theo chuẩn HTTP
+    if (res.status === 204 || res.status === 205) {
+      return { isSuccess: true, value: undefined as unknown as T };
+    }
+
+    const rawText = await res.text();
     const contentType = res.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
-      const data = await res.json();
-      if (typeof data.isSuccess === 'boolean') {
+
+    if (contentType && contentType.includes('json') && rawText.trim().length > 0) {
+      const data = JSON.parse(rawText);
+      if (data && typeof data === 'object' && typeof data.isSuccess === 'boolean') {
         return data as ApiResult<T>;
       }
       if (res.ok) {
@@ -61,8 +68,8 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
       return {
         isSuccess: false,
         error: {
-          code: data.code || `HTTP_${res.status}`,
-          message: data.message || res.statusText || 'Yêu cầu không thành công.',
+          code: data?.code || `HTTP_${res.status}`,
+          message: data?.message || data?.detail || data?.title || res.statusText || 'Yêu cầu không thành công.',
         },
       };
     }
@@ -71,12 +78,11 @@ export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): 
       return { isSuccess: true, value: undefined as unknown as T };
     }
 
-    const text = await res.text();
     return {
       isSuccess: false,
       error: {
         code: `HTTP_${res.status}`,
-        message: text || `Lỗi HTTP ${res.status}: ${res.statusText}`,
+        message: rawText || `Lỗi HTTP ${res.status}: ${res.statusText}`,
       },
     };
   } catch (err: any) {
